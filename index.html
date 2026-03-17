@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ระบบมอบตัวนักเรียน | โรงเรียนคำยางพิทยา</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.cdnfonts.com/css/google-sans" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Google Sans"', '"Noto Sans Thai"', 'sans-serif'],
+                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace']
+                    },
+                    colors: {
+                        primary: '#ff1e00', // Brightly Orange
+                        primaryLight: '#ff5438',
+                        primaryDark: '#cc1800',
+                        secondary: '#1e293b', // Slate 800
+                        accent: '#ff1e00', 
+                        dimBlue: '#e8f9fd', // Dimly Blue
+                        alertGreen: '#59ce8f', // Alert/Highlight Green
+                        background: '#e8f9fd',
+                        surface: '#FFFFFF',
+                        textDark: '#0f172a',
+                        textMuted: '#64748b',
+                        navBg: '#FFFFFF',
+                        orange: {
+                            50: '#fff0ed', 100: '#ffdfd9', 200: '#ffb5a6', 300: '#ff8a73', 400: '#ff5c3f',
+                            500: '#ff1e00', // Brightly Orange
+                            600: '#d91900', 700: '#b31500', 800: '#8c1000', 900: '#660c00',
+                        },
+                        emerald: {
+                            50: '#effbf4', 100: '#d8f5e4', 200: '#b3ebcd', 300: '#84deb3', 400: '#59ce8f', // Highlight Green
+                            500: '#32bb77', 600: '#23965e', 700: '#1d774d', 800: '#185f3f', 900: '#144e34',
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                        'floating': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                    },
+                    borderRadius: {
+                        '4xl': '2rem',
+                        '5xl': '2.5rem',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-background text-textDark antialiased h-screen w-screen overflow-hidden flex flex-col font-sans">
+
+    <!-- Header (Clean White Theme) -->
+    <header class="bg-white text-textDark sticky top-0 z-40 print:hidden h-20 shadow-soft flex items-center justify-between px-6 md:px-12 border-b border-gray-100 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-gray-50 text-secondary border border-gray-200 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                <img id="headerSchoolLogo" src="" alt="School Logo" class="w-full h-full object-cover">
+            </div>
+            <div>
+                <h1 class="font-black text-xl text-gray-800 tracking-tight leading-none" id="headerSchoolName">
+                    โรงเรียน...
+                </h1>
+                <p class="text-[11px] text-primary font-bold uppercase tracking-wider flex items-center gap-1">STUDENT ENROLLMENT</p>
+            </div>
+        </div>
+        
+        <!-- Top Right Actions -->
+        <div class="flex items-center gap-3">
+            <button onclick="app.toggleMobileMenu()" class="md:hidden p-2 text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100/50 transition-colors">
+                <i class="ph-bold ph-list text-2xl"></i>
+            </button>
+            <button onclick="app.navigate('settings')" class="hidden md:block px-6 py-2.5 bg-secondary hover:bg-gray-800 text-white text-sm font-bold rounded-xl transition-all shadow-sm">
+                แอดมิน
+            </button>
+        </div>
+    </header>
+
+    <!-- Mobile Sidebar -->
+    <div id="mobileSidebarOverlay" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 hidden transition-opacity" onclick="app.toggleMobileMenu()"></div>
+    <div id="mobileSidebar" class="fixed top-0 right-0 h-full w-64 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 flex flex-col">
+        <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="font-bold text-gray-800 text-lg">เมนูหลัก</h3>
+            <button onclick="app.toggleMobileMenu()" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition-colors">
+                <i class="ph-bold ph-x"></i>
+            </button>
+        </div>
+        <div class="p-4 flex flex-col gap-2 overflow-y-auto">
+            <button class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium transition-all hover:bg-orange-50 hover:text-orange-600 outline-none data-target-dashboard" data-target="dashboard" onclick="app.toggleMobileMenu(); app.navigate('dashboard')">
+                <i class="ph-bold ph-squares-four text-lg"></i> ภาพรวม
+            </button>
+            <button class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium transition-all hover:bg-orange-50 hover:text-orange-600 outline-none data-target-point1" data-target="point1" onclick="app.toggleMobileMenu(); app.navigate('point1')">
+                <i class="ph-bold ph-identification-card text-lg"></i> ลงทะเบียนมอบตัว
+            </button>
+            <button class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium transition-all hover:bg-orange-50 hover:text-orange-600 outline-none data-target-point2" data-target="point2" onclick="app.toggleMobileMenu(); app.navigate('point2')">
+                <i class="ph-bold ph-t-shirt text-lg"></i> จัดการบิลชุดพละ
+            </button>
+            <button class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium transition-all hover:bg-orange-50 hover:text-orange-600 outline-none data-target-point3" data-target="point3" onclick="app.toggleMobileMenu(); app.navigate('point3')">
+                <i class="ph-bold ph-handbag text-lg"></i> ใช้อุปกรณ์
+            </button>
+            <button class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium transition-all hover:bg-orange-50 hover:text-orange-600 outline-none data-target-point4" data-target="point4" onclick="app.toggleMobileMenu(); app.navigate('point4')">
+                <i class="ph-bold ph-receipt text-lg"></i> จุดชำระเงิน
+            </button>
+            <button class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium transition-all hover:bg-orange-50 hover:text-orange-600 outline-none data-target-summary" data-target="summary" onclick="app.toggleMobileMenu(); app.navigate('summary')">
+                <i class="ph-bold ph-table text-lg"></i> สรุปข้อมูล
+            </button>
+            <button class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium transition-all hover:bg-orange-50 hover:text-orange-600 outline-none data-target-settings" data-target="settings" onclick="app.toggleMobileMenu(); app.navigate('settings')">
+                <i class="ph-bold ph-gear text-lg"></i> ตั้งค่าระบบ
+            </button>
+        </div>
+        <div class="mt-auto p-4 border-t border-gray-100 bg-gray-50/50">
+            <button onclick="app.toggleMobileMenu(); app.navigate('settings')" class="w-full px-4 py-3 bg-secondary hover:bg-gray-800 text-white text-sm font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+                <i class="ph-bold ph-gear"></i> ตั้งค่าระบบ
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main id="mainContent" class="flex-1 overflow-y-auto relative pb-20 hide-scrollbar scroll-smooth">
+        
+        <!-- Horizontal Pill Navigation -->
+        <div class="sticky top-0 z-30 bg-background/90 backdrop-blur-md py-6 px-4 md:px-12 border-b border-gray-100 print:hidden shadow-sm">
+            <div class="flex items-center gap-3 overflow-x-auto hide-scrollbar max-w-4xl mx-auto w-full whitespace-nowrap">
+                <button class="nav-btn shrink-0 px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-bold transition-all border outline-none active data-target-dashboard" data-target="dashboard" onclick="app.navigate('dashboard')">
+                    <i class="ph-bold ph-squares-four text-lg"></i> ภาพรวม
+                </button>
+                <button class="nav-btn shrink-0 px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-all border outline-none data-target-point1" data-target="point1" onclick="app.navigate('point1')">
+                    <i class="ph-bold ph-identification-card text-lg"></i> ลงทะเบียนมอบตัว
+                </button>
+                <button class="nav-btn shrink-0 px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-all border outline-none data-target-point2" data-target="point2" onclick="app.navigate('point2')">
+                    <i class="ph-bold ph-t-shirt text-lg"></i> จัดการบิลชุดพละ
+                </button>
+                <button class="nav-btn shrink-0 px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-all border outline-none data-target-point3" data-target="point3" onclick="app.navigate('point3')">
+                    <i class="ph-bold ph-handbag text-lg"></i> ใช้อุปกรณ์
+                </button>
+                <button class="nav-btn shrink-0 px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-all border outline-none data-target-point4" data-target="point4" onclick="app.navigate('point4')">
+                    <i class="ph-bold ph-receipt text-lg"></i> จุดชำระเงิน
+                </button>
+                <button class="nav-btn shrink-0 px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-medium transition-all border outline-none data-target-summary" data-target="summary" onclick="app.navigate('summary')">
+                    <i class="ph-bold ph-table text-lg"></i> สรุปข้อมูล
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <section id="view-dashboard" class="app-view active-view p-4 py-8 md:max-w-4xl md:mx-auto">
+            <div class="mb-4">
+                <h2 class="text-2xl font-bold">ภาพรวม (Dashboard)</h2>
+                <p class="text-textMuted text-sm">สรุปข้อมูลการมอบตัวและรายได้</p>
+            </div>
+            <!-- Dashboard content will be injected here by JS -->
+            <div id="dashboardContent" class="space-y-4"></div>
+        </section>
+
+        <!-- Point 1: Registration View -->
+        <section id="view-point1" class="app-view p-4 py-8 md:max-w-7xl md:mx-auto hidden">
+            <div class="mb-4">
+                <h2 class="text-2xl font-bold text-primary">จุดที่ 1: ลงทะเบียน</h2>
+                <p class="text-textMuted text-sm">ตรวจสอบเอกสารและเพิ่มรายชื่อนักเรียน</p>
+            </div>
+            <div id="point1Content" class="space-y-4"></div>
+        </section>
+
+        <!-- Point 2: Uniform View -->
+        <section id="view-point2" class="app-view p-4 py-8 max-w-3xl mx-auto hidden">
+            <div class="mb-4">
+                <h2 class="text-2xl font-bold text-primary">จุดที่ 2: ชุดพละ</h2>
+                <p class="text-textMuted text-sm">เลือกไซส์เสื้อและกางเกงพละ</p>
+            </div>
+            <div id="point2Content" class="space-y-4"></div>
+        </section>
+
+        <!-- Point 3: Other Items View -->
+        <section id="view-point3" class="app-view p-4 py-8 max-w-3xl mx-auto hidden">
+            <div class="mb-4">
+                <h2 class="text-2xl font-bold text-primary">จุดที่ 3: สั่งซื้ออุปกรณ์</h2>
+                <p class="text-textMuted text-sm">กระเป๋า เข็มกลัด สมุด และอื่นๆ</p>
+            </div>
+            <div id="point3Content" class="space-y-4"></div>
+        </section>
+
+        <!-- Point 4: Payment View -->
+        <section id="view-point4" class="app-view p-4 py-8 md:max-w-5xl md:mx-auto hidden">
+            <div class="mb-4 no-print">
+                <h2 class="text-2xl font-bold text-primary">จุดที่ 4: ชำระเงิน</h2>
+                <p class="text-textMuted text-sm">ออกใบเสร็จรับเงิน</p>
+            </div>
+            <div id="point4Content" class="space-y-4"></div>
+        </section>
+
+        <!-- Summary View -->
+        <section id="view-summary" class="app-view p-4 py-8 md:max-w-6xl md:mx-auto hidden">
+            <div class="mb-4 flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">ตารางสรุปข้อมูลนักเรียน</h2>
+                    <p class="text-textMuted text-sm">รายละเอียดคำสั่งซื้อของนักเรียนทุกคน — เฉพาะแอดมิน</p>
+                </div>
+                <button onclick="app.exportSummaryPdf()" class="flex items-center gap-2 px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold text-sm transition-all shadow-sm">
+                    <i class="ph-bold ph-file-pdf text-lg"></i> ดาวน์โหลด PDF
+                </button>
+            </div>
+            <div id="summaryContent" class="space-y-4"></div>
+        </section>
+
+        <!-- Settings View -->
+        <section id="view-settings" class="app-view p-4 py-8 md:max-w-4xl md:mx-auto hidden">
+            <div class="mb-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">ตั้งค่าระบบ</h2>
+                    <p class="text-textMuted text-sm">จัดการข้อมูลโรงเรียนและสินค้า</p>
+                </div>
+                <button onclick="app.navigate('dashboard')"
+                    class="text-primary font-medium p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">เสร็จสิ้น</button>
+            </div>
+            <div id="settingsContent" class="space-y-6"></div>
+        </section>
+
+    </main>
+
+    <!-- Toasts / Notifications Area -->
+    <div id="toastContainer"
+        class="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-[90%] max-w-sm pointer-events-none no-print">
+    </div>
+
+    <!-- Edit Student Modal -->
+    <div id="editStudentModal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto w-full h-full no-print">
+        <div class="bg-white rounded-[2rem] shadow-xl w-full max-w-md mx-auto relative overflow-hidden transform transition-all flex flex-col max-h-[90vh]">
+            <!-- Modal Header -->
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2 text-lg">
+                    <div class="bg-orange-100 text-orange-600 p-2 rounded-xl"><i class="ph-bold ph-pencil-simple"></i></div>
+                    แก้ไขข้อมูลนักเรียน
+                </h3>
+                <button onclick="app.closeEditStudentModal()" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                    <i class="ph-bold ph-x"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="p-6 overflow-y-auto flex-1">
+                <form id="editStudentForm" class="space-y-4" onsubmit="app.saveStudentEdit(event)">
+                    <input type="hidden" id="editStudentId">
+                    
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">คำนำหน้า</label>
+                            <select id="editTitle" required class="bg-gray-50 border border-transparent rounded-xl px-3 py-3 w-full focus:bg-white focus:ring-2 focus:ring-orange-100 focus:border-orange-300 outline-none transition-all text-sm font-medium">
+                                <option value="ด.ช.">ด.ช.</option>
+                                <option value="ด.ญ.">ด.ญ.</option>
+                                <option value="นาย">นาย</option>
+                                <option value="นางสาว">นางสาว</option>
+                            </select>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">ชื่อ</label>
+                            <input type="text" id="editFirstName" required class="bg-gray-50 border border-transparent rounded-xl px-4 py-3 w-full focus:bg-white focus:ring-2 focus:ring-orange-100 focus:border-orange-300 outline-none transition-all text-sm font-medium">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">นามสกุล</label>
+                        <input type="text" id="editLastName" required class="bg-gray-50 border border-transparent rounded-xl px-4 py-3 w-full focus:bg-white focus:ring-2 focus:ring-orange-100 focus:border-orange-300 outline-none transition-all text-sm font-medium">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">ระดับชั้น</label>
+                        <select id="editGrade" required class="bg-gray-50 border border-transparent rounded-xl px-4 py-3 w-full focus:bg-white focus:ring-2 focus:ring-orange-100 focus:border-orange-300 outline-none transition-all text-sm font-medium">
+                            <option value="ม.1">มัธยมศึกษาปีที่ 1 (ม.1)</option>
+                            <option value="ม.4">มัธยมศึกษาปีที่ 4 (ม.4)</option>
+                            <option value="อื่นๆ">อื่นๆ</option>
+                        </select>
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="mt-8 pt-5 border-t border-gray-100 sticky bottom-0 bg-white">
+                        <button type="submit" class="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl px-4 py-3.5 hover:from-orange-600 hover:to-amber-600 transition-all active:scale-[0.98] shadow-md text-base flex items-center justify-center gap-2">
+                            <i class="ph-bold ph-floppy-disk"></i> บันทึกการแก้ไข
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <?!= include('stylesheet'); ?>
+</head>
+
+<body>
+    <div id="app">
+        <!-- App content loaded here -->
+    </div>
+
+    <script>
+        // Google Apps Script API
+        const GAS = {
+            url: 'YOUR_GAS_WEB_APP_URL', // ใส่ URL จาก Deploy
+
+            async post(action, data) {
+                const params = {
+                    action: action,
+                    data: JSON.stringify(data || {})
+                };
+
+                const response = await fetch(this.url + '?' + Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&'), {
+                    method: 'POST'
+                });
+
+                return await response.json();
+            }
+        };
+
+        // App State
+        const app = {
+            data: {},
+            state: {
+                token: localStorage.getItem('token') || null,
+                role: localStorage.getItem('role') || null,
+                p4Tab: 'pending'
+            },
+
+            async init() {
+                // Check for cached session
+                if (this.state.token && this.state.role) {
+                    await this.loadData();
+                    this.navigate('dashboard');
+                } else {
+                    this.showLogin();
+                }
+            },
+
+            async loadData() {
+                try {
+                    const [settings, students] = await Promise.all([
+                        GAS.post('getSettings'),
+                        GAS.post('getStudents')
+                    ]);
+
+                    this.data.settings = settings;
+                    this.data.students = students;
+                } catch (e) {
+                    console.error(e);
+                    this.showToast('ไม่สามารถโหลดข้อมูลได้', 'error');
+                }
+            },
+
+            showLogin() {
+                document.getElementById('app').innerHTML = `
+          <div class="login-container">
+            <div class="login-box">
+              <h1>ระบบมอบตัวนักเรียน</h1>
+              <select id="loginRole">
+                <option value="finance">ฝ่ายการเงิน</option>
+                <option value="admin">แอดมิน</option>
+              </select>
+              <input type="password" id="loginPin" placeholder="รหัสผ่าน">
+              <button onclick="app.login()">เข้าสู่ระบบ</button>
+            </div>
+          </div>
+        `;
+            },
+
+            async login() {
+                const role = document.getElementById('loginRole').value;
+                const pin = document.getElementById('loginPin').value;
+
+                const result = await GAS.post('login', { pin, role });
+
+                if (result.success) {
+                    this.state.token = result.token;
+                    this.state.role = result.role;
+                    localStorage.setItem('token', result.token);
+                    localStorage.setItem('role', result.role);
+
+                    await this.loadData();
+                    this.navigate('dashboard');
+                } else {
+                    this.showToast(result.error || 'รหัสผิด', 'error');
+                }
+            },
+
+            showToast(message, type = 'success') {
+                // Toast implementation
+            },
+
+            navigate(viewId) {
+                // Navigation implementation
+            }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+
+</html>

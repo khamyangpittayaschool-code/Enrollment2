@@ -1,0 +1,140 @@
+/* Custom utilities */
+
+/* Hide scrollbar but allow scrolling */
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* App View Transitions */
+.app-view {
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.app-view.hidden {
+    display: none;
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+.app-view.active-view {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Nav Button Active State */
+.nav-btn.active {
+    background-color: #111827 !important; /* Navy/Black */
+    color: #FFFFFF !important;
+    border-color: #111827 !important;
+}
+
+.nav-btn:hover:not(.active) {
+    background-color: #F3F4F6;
+}
+
+/* Custom Checkbox/Radio styling for premium look */
+.custom-radio:checked+div {
+    border-color: #059669;
+    background-color: #ECFDF5;
+    color: #059669;
+}
+
+.custom-radio:checked+div i {
+    opacity: 1;
+}
+
+/* Base Body tweaks for floating nav */
+body {
+    background-color: #F8F9FA;
+}
+
+/* Container Spacing for Header overlap */
+.app-view {
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+    padding-top: 1rem;
+}
+
+/* Animations */
+.fade-in {
+    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Toast Animation */
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+.toast-enter {
+    animation: slideDown 0.3s ease-out forwards;
+}
+
+.toast-exit {
+    animation: fadeOut 0.3s ease-out forwards;
+}
+
+/* Print Styles for Receipt */
+@media print {
+    @page {
+        margin: 0;
+        size: A4;
+    }
+
+    body {
+        background-color: white !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    #mainContent {
+        overflow: visible !important;
+        padding-bottom: 0 !important;
+    }
+
+    .app-view {
+        padding: 0 !important;
+    }
+
+    .receipt-container {
+        page-break-inside: avoid;
+    }
+}
