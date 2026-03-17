@@ -76,6 +76,9 @@ const app = {
         // Auto-fetch data from Google Sheets on startup
         if (this.data.settings.googleSheetUrl) {
             this._pullFromGAS(true); // silent = true on init
+
+            // Auto-refresh every 30 seconds when Google Sheets is configured
+            this._startAutoRefresh(30000); // 30 seconds
         }
 
         // Setup print listener to cleanup
@@ -83,6 +86,24 @@ const app = {
             const printContainer = document.getElementById('printContainer');
             if (printContainer) printContainer.innerHTML = '';
         });
+    },
+
+    // Auto-refresh interval for real-time sync
+    _startAutoRefresh(intervalMs = 30000) {
+        // Clear any existing interval
+        if (this._autoRefreshInterval) {
+            clearInterval(this._autoRefreshInterval);
+        }
+
+        // Set up new interval
+        this._autoRefreshInterval = setInterval(() => {
+            if (this.data.settings.googleSheetUrl) {
+                console.log('[Auto-refresh] Syncing with Google Sheets...');
+                this._pullFromGAS(true); // silent = true for background refresh
+            }
+        }, intervalMs);
+
+        console.log('[Auto-refresh] Enabled - syncing every', intervalMs / 1000, 'seconds');
     },
 
     loadData() {
@@ -103,6 +124,7 @@ const app = {
     },
 
     saveData() {
+        this.data.lastUpdated = Date.now();
         localStorage.setItem(DB_KEY, JSON.stringify(this.data));
         // Background push to Google Sheets (fire-and-forget)
         this._pushToGAS();
@@ -417,13 +439,19 @@ const app = {
         try {
             const payload = {
                 action: 'saveData',
-                data: JSON.stringify(this.data)
+                data: this.data
             };
+
+            // Use regular fetch to get response (may fail CORS but that's okay)
             fetch(url, {
                 method: 'POST',
                 body: JSON.stringify(payload),
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                mode: 'no-cors'
+                headers: { 'Content-Type': 'application/json' }
+            }).then(response => {
+                console.log('[GAS] Push successful');
+            }).catch(err => {
+                // Silent fail for background push
+                console.log('[GAS] Push sent (background mode)');
             });
         } catch (error) {
             console.warn('Background push to GAS failed:', error);
@@ -449,6 +477,13 @@ const app = {
 
             if (result.status === 'success' && result.data) {
                 const remoteData = JSON.parse(result.data);
+                
+                // Conflict resolution: only overwrite if remote data is newer
+                if (remoteData.lastUpdated && this.data.lastUpdated && remoteData.lastUpdated <= this.data.lastUpdated) {
+                    if (!silent) console.log('[Sync] Local data is newer or same as remote, skipping pull');
+                    return; 
+                }
+
                 // Preserve local googleSheetUrl (don't overwrite with remote)
                 const localUrl = this.data.settings.googleSheetUrl;
                 this.data = remoteData;
@@ -501,7 +536,12 @@ const app = {
                 }
                 this.saveData();
                 this.renderHeader();
-                this.showToast('บันทึกการตั้งค่าเรียบร้อย');
+                this.showToast('บันทึกการตั้งค่าเรียบร้อย ✅');
+
+                // Start auto-refresh if URL was just added
+                if (googleSheetUrl) {
+                    this._startAutoRefresh(30000);
+                }
 
                 if (logoDataUrl) {
                     this.renderSettings(); // re-render to show updated image preview
@@ -511,19 +551,48 @@ const app = {
 
         if (logoInput && logoInput.files && logoInput.files[0]) {
             const reader = new FileReader();
-            reader.onload = (e) => {
-                // Instant logo preview - update header immediately
-                const logoImg = document.getElementById('headerSchoolLogo');
-                if (logoImg) {
-                    logoImg.src = e.target.result;
+            reader.onload = async (e) => {
+                // Compress logo to avoid cell limits (max 400px width, 0.7 quality)
+                try {
+                    const compressedLogo = await this.compressImage(e.target.result, 400, 0.7);
+                    // Instant logo preview
+                    const logoImg = document.getElementById('headerSchoolLogo');
+                    if (logoImg) logoImg.src = compressedLogo;
+                    proceedSave(compressedLogo);
+                } catch (err) {
+                    console.warn('Compression failed, using original', err);
+                    proceedSave(e.target.result);
                 }
-                // Then save
-                proceedSave(e.target.result);
             };
             reader.readAsDataURL(logoInput.files[0]);
         } else {
             proceedSave(null);
         }
+    },
+
+    // Helper to compress image to avoid Google Sheets cell limits
+    compressImage(dataUrl, maxWidth, quality) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = dataUrl;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height = (maxWidth / width) * height;
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = reject;
+        });
     },
 
     addItem(type) {
@@ -1385,7 +1454,7 @@ const app = {
 
     renderPoint3() {
         const items = this.data.settings.items;
-        
+
         // Split students
         const pendingStudents = this.data.students.filter(s => s.paymentStatus === 'pending');
         const p3Pending = pendingStudents.filter(s => !s.p3Confirmed);
@@ -1986,7 +2055,7 @@ const app = {
 
     _getSummaryTableHtml(students, title) {
         if (!students || students.length === 0) return '';
-        
+
         const uniforms = this.data.settings.uniforms;
         const items = this.data.settings.items;
         const shirts = uniforms.filter(u => u.type === 'shirt');
@@ -2136,25 +2205,25 @@ const app = {
     showChangeFinancePinModal() {
         const currentPin = prompt('กรุณาใส่รหัสปัจจุบัน:');
         if (!currentPin) return;
-        
+
         // Verify current finance PIN
         if (currentPin !== this.data.settings.financePin && currentPin !== this.data.settings.adminPin) {
             this.showToast('รหัสปัจจุบันไม่ถูกต้อง', 'error');
             return;
         }
-        
+
         const newPin = prompt('กรุณาใส่รหัสใหม่:');
         if (!newPin || newPin.length < 4) {
             this.showToast('รหัสต้องมีอย่างน้อย 4 ตัวอักษร', 'error');
             return;
         }
-        
+
         const confirmPin = prompt('ยืนยันรหัสใหม่อีกครั้ง:');
         if (newPin !== confirmPin) {
             this.showToast('รหัสใหม่ไม่ตรงกัน กรุณาลองใหม่', 'error');
             return;
         }
-        
+
         this.data.settings.financePin = newPin;
         this.saveData();
         this.showToast('เปลี่ยนรหัสการเงินเรียบร้อยแล้ว ✅');

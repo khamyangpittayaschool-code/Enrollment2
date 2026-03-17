@@ -29,8 +29,25 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  let data = null;
+  
+  // Try to parse data from different sources
+  try {
+    if (e.parameter.action && e.parameter.data) {
+      // Standard form post
+      data = JSON.parse(e.parameter.data);
+    } else if (e.postData && e.postData.contents) {
+      // JSON body post
+      const parsed = JSON.parse(e.postData.contents);
+      data = parsed.data;
+      // Override action if provided in body
+      if (parsed.action) e.parameter.action = parsed.action;
+    }
+  } catch (error) {
+    // Ignore parsing errors
+  }
+  
   const action = e.parameter.action;
-  const data = JSON.parse(e.parameter.data);
   
   try {
     let result;
@@ -56,6 +73,12 @@ function doPost(e) {
         break;
       case 'getSettings':
         result = handleGetSettings();
+        break;
+      case 'saveData':
+        result = handleSaveFullData(data);
+        break;
+      case 'getData':
+        result = handleGetFullData();
         break;
       default:
         result = { success: false, error: 'Unknown action' };
@@ -209,6 +232,11 @@ function handleSaveSettings(data) {
   sheet.appendRow(['financePin', data.financePin || CONFIG.financePin]);
   sheet.appendRow(['receiverName', data.receiverName || 'เจ้าหน้าที่การเงิน']);
   
+  // Save school logo (base64 data URL)
+  if (data.schoolLogo) {
+    sheet.appendRow(['schoolLogo', data.schoolLogo]);
+  }
+  
   // Save uniforms
   if (data.uniforms) {
     sheet.appendRow(['uniforms', JSON.stringify(data.uniforms)]);
@@ -231,6 +259,7 @@ function handleGetSettings() {
     adminPin: CONFIG.adminPin,
     financePin: CONFIG.financePin,
     receiverName: 'เจ้าหน้าที่การเงิน',
+    schoolLogo: '',
     uniforms: getDefaultUniforms(),
     items: getDefaultItems()
   };
@@ -253,6 +282,105 @@ function handleGetSettings() {
   return settings;
 }
 
+// ===== Full Data Sync =====
+
+function handleSaveFullData(data) {
+  try {
+    const sheet = getOrCreateSheet('FullData');
+    sheet.clear();
+    
+    // Store the entire data object as JSON string in cell A1
+    const jsonData = JSON.stringify(data);
+    sheet.getRange(1, 1).setValue(jsonData);
+    
+    // Also update human-readable sheets for convenience
+    if (data.students) {
+      updateStudentsSheet(data.students, data.settings);
+    }
+    if (data.settings) {
+      updateSettingsSheet(data.settings);
+    }
+    
+    return { status: 'success', message: 'Data saved successfully' };
+  } catch (error) {
+    return { status: 'error', message: error.toString() };
+  }
+}
+
+function handleGetFullData() {
+  try {
+    const sheet = getOrCreateSheet('FullData');
+    const value = sheet.getRange(1, 1).getValue();
+    
+    if (!value) {
+      return { status: 'empty', message: 'No data found' };
+    }
+    
+    return { status: 'success', data: value };
+  } catch (error) {
+    return { status: 'error', message: error.toString() };
+  }
+}
+
+function updateStudentsSheet(students, settings) {
+  const sheet = getOrCreateSheet('Students');
+  // Clear existing data except header
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, 12).clearContent();
+  }
+  
+  if (students.length === 0) return;
+  
+  const rows = students.map(s => {
+    // Calculate total for visibility in sheet
+    let total = 0;
+    if (settings) {
+      (s.shirts || []).forEach(sh => {
+        const u = settings.uniforms.find(x => x.id === sh.id);
+        if (u) total += sh.qty * u.price;
+      });
+      (s.pants || []).forEach(pa => {
+        const u = settings.uniforms.find(x => x.id === pa.id);
+        if (u) total += pa.qty * u.price;
+      });
+      (s.items || []).forEach(i => {
+        const iDef = settings.items.find(x => x.id === i.id);
+        if (iDef) total += i.qty * iDef.price;
+      });
+    }
+
+    return [
+      s.id,
+      s.refCode,
+      s.title || '',
+      s.firstName,
+      s.lastName,
+      s.grade,
+      JSON.stringify(s.shirts || []),
+      JSON.stringify(s.pants || []),
+      JSON.stringify(s.items || []),
+      s.paymentStatus,
+      s.paidAt || '',
+      total // Add total to the last column for human viewing
+    ];
+  });
+  
+  sheet.getRange(2, 1, rows.length, 12).setValues(rows);
+}
+
+function updateSettingsSheet(settings) {
+  const sheet = getOrCreateSheet('Settings');
+  sheet.clear();
+  sheet.appendRow(['Key', 'Value']);
+  sheet.appendRow(['schoolName', settings.schoolName || '']);
+  sheet.appendRow(['receiverName', settings.receiverName || '']);
+  sheet.appendRow(['lastUpdated', new Date().toISOString()]);
+  
+  // Note: We don't save the full logo to the Settings sheet cell to avoid cell limit issues
+  // The logo is preserved in the FullData A1 JSON blob
+}
+
 // ===== Helpers =====
 
 function getOrCreateSheet(name) {
@@ -263,7 +391,8 @@ function getOrCreateSheet(name) {
     sheet = ss.insertSheet(name);
     // Create header for Students sheet
     if (name === 'Students') {
-      sheet.appendRow(['id', 'refCode', 'title', 'firstName', 'lastName', 'grade', 'shirts', 'pants', 'items', 'paymentStatus', 'paidAt', 'createdAt']);
+      sheet.appendRow(['id', 'refCode', 'title', 'firstName', 'lastName', 'grade', 'shirts', 'pants', 'items', 'paymentStatus', 'paidAt', 'Total (View Only)']);
+      sheet.getRange("A1:L1").setFontWeight("bold").setBackground("#f1f5f9");
     }
   }
   
