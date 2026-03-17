@@ -6,7 +6,7 @@ const defaultData = {
         adminPin: 'admin123',
         financePin: '123456',
         receiverName: 'เจ้าหน้าที่การเงิน',
-        googleSheetUrl: '',
+        googleSheetUrl: 'https://script.google.com/macros/s/AKfycbzutKMZwHFwwUusRwZsb5rjgS4K8ILViEwmPdHX0iaVgr3DL9xhaed1QcjbECE-O5xj8Q/exec',
         uniforms: [
             { id: 'u1', type: 'shirt', size: 'S', price: 150 },
             { id: 'u2', type: 'shirt', size: 'M', price: 160 },
