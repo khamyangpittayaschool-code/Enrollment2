@@ -73,6 +73,11 @@ const app = {
         this.createPinModal();
         this.navigate(this.currentView, true);
 
+        // Auto-fetch data from Google Sheets on startup
+        if (this.data.settings.googleSheetUrl) {
+            this._pullFromGAS(true); // silent = true on init
+        }
+
         // Setup print listener to cleanup
         window.addEventListener('afterprint', () => {
             const printContainer = document.getElementById('printContainer');
@@ -99,6 +104,8 @@ const app = {
 
     saveData() {
         localStorage.setItem(DB_KEY, JSON.stringify(this.data));
+        // Background push to Google Sheets (fire-and-forget)
+        this._pushToGAS();
     },
 
     navigate(viewId, isInit = false) {
@@ -402,11 +409,31 @@ const app = {
         return { total, details };
     },
 
-    // --- Settings Logic ---
-    async syncToGoogleSheets() {
+    // --- Google Sheets Central DB ---
+    async _pushToGAS() {
+        const url = this.data.settings.googleSheetUrl;
+        if (!url) return; // No URL configured, skip silently
+
+        try {
+            const payload = {
+                action: 'saveData',
+                data: JSON.stringify(this.data)
+            };
+            fetch(url, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                mode: 'no-cors'
+            });
+        } catch (error) {
+            console.warn('Background push to GAS failed:', error);
+        }
+    },
+
+    async _pullFromGAS(silent = false) {
         const url = this.data.settings.googleSheetUrl;
         if (!url) {
-            this.showToast('กรุณาตั้งค่า URL ของ Web App Google Apps Script ก่อน', 'error');
+            if (!silent) this.showToast('กรุณาตั้งค่า URL ของ Web App ก่อน', 'error');
             return;
         }
 
@@ -416,27 +443,41 @@ const app = {
         if (icon) icon.classList.add('animate-spin');
 
         try {
-            const payload = {
-                action: 'syncData',
-                data: JSON.stringify(this.data)
-            };
+            const fetchUrl = url + '?action=getData&t=' + Date.now();
+            const response = await fetch(fetchUrl);
+            const result = await response.json();
 
-            await fetch(url, {
-                method: 'POST',
-                body: JSON.stringify(payload),
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-            });
-
-            this.showToast('ข้อมูลถูกส่งไปยังเซิร์ฟเวอร์เรียบร้อยแล้ว สำเร็จ!');
+            if (result.status === 'success' && result.data) {
+                const remoteData = JSON.parse(result.data);
+                // Preserve local googleSheetUrl (don't overwrite with remote)
+                const localUrl = this.data.settings.googleSheetUrl;
+                this.data = remoteData;
+                this.data.settings.googleSheetUrl = localUrl;
+                localStorage.setItem(DB_KEY, JSON.stringify(this.data));
+                this.renderHeader();
+                this.renderView(this.currentView);
+                if (!silent) this.showToast('โหลดข้อมูลล่าสุดจากเซิร์ฟเวอร์เรียบร้อย ✅');
+            } else if (result.status === 'empty') {
+                // No data on server yet, push current data
+                if (!silent) this.showToast('ยังไม่มีข้อมูลบนเซิร์ฟเวอร์ กำลังส่งข้อมูลขึ้นไป...', 'info');
+                this._pushToGAS();
+            } else {
+                if (!silent) this.showToast('ไม่สามารถโหลดข้อมูลได้: ' + (result.message || 'Unknown error'), 'error');
+            }
         } catch (error) {
-            console.error('Sync Error:', error);
-            // Some GAS setup throw CORS but still execute the script.
-            this.showToast('คำสั่งถูกส่งไปแล้ว (อาจจะมีเตือน CORS กรุณาเช็คในชีต)', 'info');
+            console.error('Pull from GAS Error:', error);
+            if (!silent) this.showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ ใช้ข้อมูล offline แทน', 'error');
         } finally {
             if (btn) btn.disabled = false;
             if (icon) icon.classList.remove('animate-spin');
         }
     },
+
+    async syncToGoogleSheets() {
+        await this._pullFromGAS(false);
+    },
+
+    // --- Settings Logic ---
 
     saveSettings() {
         const schoolName = document.getElementById('settingSchoolName').value;
@@ -1047,8 +1088,8 @@ const app = {
         document.getElementById('dashboardContent').innerHTML = `
             <div class="flex justify-between items-center mb-5">
                 <h2 class="text-xl font-bold text-gray-800">ภาพรวมระบบ</h2>
-                <button id="syncBtn" onclick="app.syncToGoogleSheets()" class="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-full font-bold text-xs transition-colors shadow-sm">
-                    <i id="syncIcon" class="ph-bold ph-arrows-clockwise text-base"></i> ซิงค์ Google Sheets
+                <button id="syncBtn" onclick="app.syncToGoogleSheets()" class="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-full font-bold text-xs transition-colors shadow-sm">
+                    <i id="syncIcon" class="ph-bold ph-arrows-clockwise text-base"></i> โหลดข้อมูลล่าสุด
                 </button>
             </div>
             
@@ -1787,7 +1828,7 @@ const app = {
             </div>
 
             <!--Flexible Items-->
-    <div class="bg-white p-6 rounded-[2rem] shadow-soft border border-gray-100 mb-20">
+    <div class="bg-white p-6 rounded-[2rem] shadow-soft border border-gray-100 mb-8">
         <div class="flex justify-between items-center mb-5">
             <h3 class="font-bold text-gray-800 flex items-center gap-2 text-base"><i class="ph-fill ph-handbag text-gray-800"></i> รายการสั่งซื้ออื่นๆ</h3>
             <button onclick="app.addItem('item')" class="text-xs font-bold bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors flex items-center gap-1"><i class="ph-bold ph-plus"></i> เพิ่มรายการ</button>
@@ -1798,6 +1839,21 @@ const app = {
             <div class="w-32">ราคา</div>
         </div>
         ${itemsHtml}
+    </div>
+
+    <!--Google Sheets Integration-->
+    <div class="bg-white p-6 rounded-[2rem] shadow-soft border border-gray-100 mb-8">
+        <div class="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none rounded-[2rem]"></div>
+        <h3 class="font-bold text-gray-800 mb-1 flex items-center gap-2 relative z-10 text-base"><i class="ph-fill ph-google-logo text-blue-500"></i> เชื่อมต่อ Google Sheets</h3>
+        <p class="text-xs text-gray-400 mb-4 relative z-10">ใส่ URL เพื่อให้ข้อมูลใช้ร่วมกันได้หลายเครื่อง (เรียลไทม์)</p>
+        <div class="space-y-4 relative z-10">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Google Apps Script Web App URL</label>
+                <input type="url" id="settingGoogleSheetUrl" value="${s.googleSheetUrl || ''}" placeholder="https://script.google.com/macros/s/.../exec" class="bg-gray-50 border border-transparent rounded-2xl px-4 py-3.5 w-full focus:bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all font-mono text-xs">
+                <p class="text-[10px] text-gray-400 mt-2"><i class="ph ph-info"></i> วาง URL ที่ได้จากการ Deploy Google Apps Script (ลงท้ายด้วย /exec)</p>
+            </div>
+            ${s.googleSheetUrl ? '<div class="flex items-center gap-2 text-xs"><span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span><span class="text-emerald-600 font-medium">เชื่อมต่อแล้ว — ข้อมูลจะถูกซิงค์อัตโนมัติ</span></div>' : '<div class="flex items-center gap-2 text-xs"><span class="w-2 h-2 bg-gray-300 rounded-full"></span><span class="text-gray-400 font-medium">ยังไม่ได้เชื่อมต่อ — ใช้ข้อมูลในเครื่องนี้เท่านั้น</span></div>'}
+        </div>
     </div>
 
     <div class="pb-12 pt-4">
