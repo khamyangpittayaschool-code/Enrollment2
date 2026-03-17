@@ -78,7 +78,7 @@ const app = {
             this._pullFromGAS(true); // silent = true on init
 
             // Auto-refresh every 30 seconds when Google Sheets is configured
-            this._startAutoRefresh(30000); // 30 seconds
+            this._startAutoRefresh(10000); // 10 seconds
         }
 
         // Setup print listener to cleanup
